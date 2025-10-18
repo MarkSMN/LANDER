@@ -12,6 +12,7 @@ var backGraySlider;
 var colorShiftSlider;
 var placementModeSelect;
 var shadowSlider;
+var refreshButton;
 
 // Add custom CSS for sliders and select
 function addSliderStyles() {
@@ -63,6 +64,22 @@ function addSliderStyles() {
       font-size: 9px;
       cursor: pointer;
     }
+    
+    /* Button styling */
+    button {
+      background: white;
+      border: 1px solid black;
+      padding: 4px 8px;
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 9px;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+    
+    button:hover {
+      background: black;
+      color: white;
+    }
   `);
   style.parent(document.head);
 }
@@ -72,8 +89,8 @@ function setup() {
   var canvasWidth = windowWidth;
   var canvasHeight = windowHeight;
   
-  // Minimum width to fit controls (9 controls * 100px spacing)
-  var minWidth = 900;
+  // Minimum width to fit controls (10 controls * 100px spacing)
+  var minWidth = 1000;
   
   // Don't go smaller than minimum width
   if (canvasWidth < minWidth) {
@@ -90,8 +107,8 @@ function setup() {
   var sliderWidth = 80;
   var spacing = 100; // Horizontal spacing between controls
   
-  // Calculate total width needed for all controls (now 9 controls)
-  var totalControlWidth = (spacing * 8) + sliderWidth; // 8 gaps + 1 final control width
+  // Calculate total width needed for all controls (9 sliders + 1 button)
+  var totalControlWidth = (spacing * 9) + sliderWidth; // 9 gaps + 1 final control width
   var startX = (canvasWidth - totalControlWidth) / 2; // Center the controls
   
   // Placement mode dropdown
@@ -170,6 +187,14 @@ function setup() {
   colorShiftSlider.position(startX + spacing * 8, controlY + 15);
   colorShiftSlider.style('width', sliderWidth + 'px');
   colorShiftSlider.input(updateFrontColors);
+  
+  // Refresh button
+  createP('regenerate').position(startX + spacing * 9, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
+  refreshButton = createButton('⟳');
+  refreshButton.position(startX + spacing * 9, controlY + 15);
+  refreshButton.style('width', sliderWidth + 'px');
+  refreshButton.style('height', '20px');
+  refreshButton.mousePressed(generateRectangles);
   
   generateRectangles();
 }
@@ -733,7 +758,7 @@ function windowResized() {
   var canvasWidth = windowWidth;
   var canvasHeight = windowHeight;
   
-  var minWidth = 900;
+  var minWidth = 1000; // Increased to fit the new button
   if (canvasWidth < minWidth) {
     canvasWidth = minWidth;
   }
@@ -744,7 +769,7 @@ function windowResized() {
   var controlY = canvasHeight - 35;
   var sliderWidth = 80;
   var spacing = 100;
-  var totalControlWidth = (spacing * 8) + sliderWidth;
+  var totalControlWidth = (spacing * 9) + sliderWidth;
   var startX = (canvasWidth - totalControlWidth) / 2;
   
   // Update all control positions
@@ -774,6 +799,9 @@ function windowResized() {
   
   selectAll('p')[8].position(startX + spacing * 8, controlY);
   colorShiftSlider.position(startX + spacing * 8, controlY + 15);
+  
+  selectAll('p')[9].position(startX + spacing * 9, controlY);
+  refreshButton.position(startX + spacing * 9, controlY + 15);
   
   // Regenerate rectangles for new canvas size
   generateRectangles();
