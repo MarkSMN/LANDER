@@ -68,18 +68,36 @@ function addSliderStyles() {
 }
 
 function setup() {
-  createCanvas(900, 1040);
+  // Calculate canvas size based on window, maintaining aspect ratio
+  // The canvas is 900x1040 (with 40px control strip), so aspect ratio is ~0.865
+  var canvasWidth = windowWidth - 40; // Padding
+  var canvasHeight = windowHeight - 40;
+  
+  // Minimum width to fit controls (9 controls * 100px spacing)
+  var minWidth = 900;
+  
+  // Don't go smaller than minimum width
+  if (canvasWidth < minWidth) {
+    canvasWidth = minWidth;
+  }
+  
+  // Calculate height maintaining space for controls (40px strip)
+  // Available drawing area should be proportional
+  var drawingHeight = canvasHeight - 40;
+  
+  createCanvas(canvasWidth, canvasHeight);
   
   // Add custom slider styling
   addSliderStyles();
   
   // Create control panel across bottom - CENTERED
-  var controlY = 1005;
+  var controlY = canvasHeight - 35; // Position in bottom strip
   var sliderWidth = 80;
-  var spacing = 100;
+  var spacing = 100; // Horizontal spacing between controls
   
-  var totalControlWidth = (spacing * 8) + sliderWidth;
-  var startX = (width - totalControlWidth) / 2;
+  // Calculate total width needed for all controls (now 9 controls)
+  var totalControlWidth = (spacing * 8) + sliderWidth; // 8 gaps + 1 final control width
+  var startX = (canvasWidth - totalControlWidth) / 2; // Center the controls
   
   // Placement mode dropdown
   createP('placement').position(startX, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
@@ -167,7 +185,8 @@ function draw() {
   var cornerRad = cornerRadiusSlider.value();
   
   var centerX = width / 2;
-  var centerY = 500;
+  var drawingHeight = height - 40; // Height minus control strip
+  var centerY = drawingHeight / 2; // Center of drawable area
   
   // BACK LAYER - Draw drop shadows first
   for (var i = 0; i < backRectangles.length; i++) {
@@ -239,7 +258,7 @@ function draw() {
   // Draw white control strip at bottom - MOVED TO END TO STAY ON TOP
   fill(255);
   noStroke();
-  rect(0, 1000, width, 40);
+  rect(0, height - 40, width, 40);
 }
 
 function drawDropShadow(rectangle, centerX, centerY, cornerRad) {
@@ -432,7 +451,7 @@ function generateRectangles() {
   var backMaxSize = backSizeSlider.value();
   var frontMaxSize = frontSizeSlider.value();
   var grayValue = backGraySlider.value();
-  var maxY = 1000;
+  var maxY = height - 40; // Drawing area height (excluding control strip)
   var mode = placementModeSelect.value();
   
   for (var i = 0; i < numBack; i++) {
@@ -561,7 +580,7 @@ function adjustBackCount() {
   var currentCount = backRectangles.length;
   var grayValue = backGraySlider.value();
   var backMaxSize = backSizeSlider.value();
-  var maxY = 1000;
+  var maxY = height - 40; // Drawing area height
   var mode = placementModeSelect.value();
   
   if (targetCount > currentCount) {
@@ -605,7 +624,7 @@ function adjustFrontCount() {
   var targetCount = numFrontSlider.value();
   var currentCount = frontRectangles.length;
   var frontMaxSize = frontSizeSlider.value();
-  var maxY = 1000;
+  var maxY = height - 40; // Drawing area height
   var mode = placementModeSelect.value();
   
   if (targetCount > currentCount) {
@@ -655,7 +674,7 @@ function updateBackColors() {
 
 function updateFrontColors() {
   var shiftAmount = colorShiftSlider.value();
-  var maxY = 1000;
+  var maxY = height - 40; // Drawing area height
   
   for (var i = 0; i < frontRectangles.length; i++) {
     var rect = frontRectangles[i];
@@ -712,4 +731,55 @@ function keyPressed() {
   } else {
     generateRectangles();
   }
+}
+
+function windowResized() {
+  // Recalculate canvas size
+  var canvasWidth = windowWidth - 40;
+  var canvasHeight = windowHeight - 40;
+  
+  var minWidth = 900;
+  if (canvasWidth < minWidth) {
+    canvasWidth = minWidth;
+  }
+  
+  resizeCanvas(canvasWidth, canvasHeight);
+  
+  // Reposition controls
+  var controlY = canvasHeight - 35;
+  var sliderWidth = 80;
+  var spacing = 100;
+  var totalControlWidth = (spacing * 8) + sliderWidth;
+  var startX = (canvasWidth - totalControlWidth) / 2;
+  
+  // Update all control positions
+  select('p').position(startX, controlY);
+  placementModeSelect.position(startX, controlY + 15);
+  
+  selectAll('p')[1].position(startX + spacing, controlY);
+  numBackSlider.position(startX + spacing, controlY + 15);
+  
+  selectAll('p')[2].position(startX + spacing * 2, controlY);
+  numFrontSlider.position(startX + spacing * 2, controlY + 15);
+  
+  selectAll('p')[3].position(startX + spacing * 3, controlY);
+  backSizeSlider.position(startX + spacing * 3, controlY + 15);
+  
+  selectAll('p')[4].position(startX + spacing * 4, controlY);
+  frontSizeSlider.position(startX + spacing * 4, controlY + 15);
+  
+  selectAll('p')[5].position(startX + spacing * 5, controlY);
+  cornerRadiusSlider.position(startX + spacing * 5, controlY + 15);
+  
+  selectAll('p')[6].position(startX + spacing * 6, controlY);
+  shadowSlider.position(startX + spacing * 6, controlY + 15);
+  
+  selectAll('p')[7].position(startX + spacing * 7, controlY);
+  backGraySlider.position(startX + spacing * 7, controlY + 15);
+  
+  selectAll('p')[8].position(startX + spacing * 8, controlY);
+  colorShiftSlider.position(startX + spacing * 8, controlY + 15);
+  
+  // Regenerate rectangles for new canvas size
+  generateRectangles();
 }
