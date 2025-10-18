@@ -68,19 +68,24 @@ function addSliderStyles() {
 }
 
 function setup() {
-  createCanvas(900, 1040); // Added 40px for control strip
+  var canvas = createCanvas(900, 1040); // Added 40px for control strip
+  canvas.parent('main'); // Parent canvas to the main container
   
   // Add custom slider styling
   addSliderStyles();
   
+  // Get canvas position on page for control positioning
+  var canvasX = canvas.elt.offsetLeft;
+  var canvasY = canvas.elt.offsetTop;
+  
   // Create control panel across bottom - CENTERED
-  var controlY = 1005; // Position in bottom strip
+  var controlY = canvasY + 1005; // Position in bottom strip relative to canvas
   var sliderWidth = 80;
   var spacing = 100; // Horizontal spacing between controls
   
   // Calculate total width needed for all controls (now 9 controls)
   var totalControlWidth = (spacing * 8) + sliderWidth; // 8 gaps + 1 final control width
-  var startX = (width - totalControlWidth) / 2; // Center the controls
+  var startX = canvasX + (width - totalControlWidth) / 2; // Center the controls relative to canvas
   
   // Placement mode dropdown (NEW - positioned first)
   createP('placement').position(startX, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
