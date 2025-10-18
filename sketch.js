@@ -68,10 +68,9 @@ function addSliderStyles() {
 }
 
 function setup() {
-  // Calculate canvas size based on window, maintaining aspect ratio
-  // The canvas is 900x1040 (with 40px control strip), so aspect ratio is ~0.865
-  var canvasWidth = windowWidth - 40; // Padding
-  var canvasHeight = windowHeight - 40;
+  // Calculate canvas size based on window - fill entire viewport
+  var canvasWidth = windowWidth;
+  var canvasHeight = windowHeight;
   
   // Minimum width to fit controls (9 controls * 100px spacing)
   var minWidth = 900;
@@ -80,10 +79,6 @@ function setup() {
   if (canvasWidth < minWidth) {
     canvasWidth = minWidth;
   }
-  
-  // Calculate height maintaining space for controls (40px strip)
-  // Available drawing area should be proportional
-  var drawingHeight = canvasHeight - 40;
   
   createCanvas(canvasWidth, canvasHeight);
   
@@ -734,9 +729,9 @@ function keyPressed() {
 }
 
 function windowResized() {
-  // Recalculate canvas size
-  var canvasWidth = windowWidth - 40;
-  var canvasHeight = windowHeight - 40;
+  // Recalculate canvas size - fill entire viewport
+  var canvasWidth = windowWidth;
+  var canvasHeight = windowHeight;
   
   var minWidth = 900;
   if (canvasWidth < minWidth) {
