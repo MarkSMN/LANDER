@@ -74,18 +74,19 @@ function setup() {
   // Add custom slider styling
   addSliderStyles();
   
-  // Get canvas position on page for control positioning
-  var canvasX = canvas.elt.offsetLeft;
-  var canvasY = canvas.elt.offsetTop;
-  
-  // Create control panel across bottom - CENTERED
-  var controlY = canvasY + 1005; // Position in bottom strip relative to canvas
-  var sliderWidth = 80;
-  var spacing = 100; // Horizontal spacing between controls
-  
-  // Calculate total width needed for all controls (now 9 controls)
-  var totalControlWidth = (spacing * 8) + sliderWidth; // 8 gaps + 1 final control width
-  var startX = canvasX + (width - totalControlWidth) / 2; // Center the controls relative to canvas
+  // Wait a frame for canvas to position, then place controls
+  setTimeout(function() {
+    var canvasElt = document.querySelector('canvas');
+    var rect = canvasElt.getBoundingClientRect();
+    
+    // Create control panel across bottom - CENTERED
+    var controlY = rect.top + 1005; // Position in bottom strip
+    var sliderWidth = 80;
+    var spacing = 100; // Horizontal spacing between controls
+    
+    // Calculate total width needed for all controls (now 9 controls)
+    var totalControlWidth = (spacing * 8) + sliderWidth; // 8 gaps + 1 final control width
+    var startX = rect.left + (width - totalControlWidth) / 2; // Center the controls
   
   // Placement mode dropdown (NEW - positioned first)
   createP('placement').position(startX, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
@@ -165,6 +166,7 @@ function setup() {
   colorShiftSlider.input(updateFrontColors);
   
   generateRectangles();
+  }, 10); // Small delay to ensure canvas is positioned
 }
 
 function draw() {
