@@ -1,18 +1,26 @@
 // Interactive control panel version with compositional placement modes
 // Custom slider styling in CSS
 var frontRectangles = [];
+var middleRectangles = []; // NEW THIRD LAYER
 var backRectangles = [];
 var hueOffset = 0; // Random starting point in color wheel
+var vanishingPoint = {x: 0, y: 0}; // Static vanishing point for shadows
 
 // Control parameters
-var numBackSlider, numFrontSlider;
-var backSizeSlider, frontSizeSlider;
+var numBackSlider, numMiddleSlider, numFrontSlider; // Added middle slider
+var backSizeSlider, middleSizeSlider, frontSizeSlider; // Added middle size slider
 var cornerRadiusSlider;
-var backGraySlider;
+var backGraySlider, middleGraySlider; // Added middle gray slider
+var backDarknessSlider; // NEW: controls how dark the back layer is
 var colorShiftSlider;
 var placementModeSelect;
 var shadowSlider;
 var refreshButton;
+
+// Antenna controls
+var antennaDensitySlider; // Percentage of boxes that get antennas
+var antennaLengthSlider; // Length multiplier relative to box size
+var antennaSpeedSlider; // Rotation speed in RPM
 
 // Add custom CSS for sliders and select
 function addSliderStyles() {
@@ -58,27 +66,38 @@ function addSliderStyles() {
     /* Select dropdown styling */
     select {
       background: white;
-      border: 1px solid black;
-      padding: 2px 4px;
+      border: 2px solid black;
+      padding: 4px 8px;
       font-family: Helvetica, Arial, sans-serif;
-      font-size: 9px;
+      font-size: 12px;
+      font-weight: bold;
       cursor: pointer;
+      border-radius: 4px;
     }
     
     /* Button styling */
     button {
       background: white;
-      border: 1px solid black;
-      padding: 4px 8px;
+      border: 2px solid black;
+      padding: 6px 12px;
       font-family: Helvetica, Arial, sans-serif;
-      font-size: 9px;
+      font-size: 12px;
+      font-weight: bold;
       cursor: pointer;
-      border-radius: 2px;
+      border-radius: 4px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
     button:hover {
       background: black;
       color: white;
+    }
+    
+    select:hover {
+      background: #f0f0f0;
     }
   `);
   style.parent(document.head);
@@ -89,8 +108,8 @@ function setup() {
   var canvasWidth = windowWidth;
   var canvasHeight = windowHeight;
   
-  // Minimum width to fit controls (10 controls * 100px spacing)
-  var minWidth = 1000;
+  // Minimum width to fit controls in 2 rows
+  var minWidth = 1000; // Less width needed now that we have 2 rows
   
   // Don't go smaller than minimum width
   if (canvasWidth < minWidth) {
@@ -98,23 +117,31 @@ function setup() {
   }
   
   createCanvas(canvasWidth, canvasHeight);
+  pixelDensity(displayDensity()); // Match display pixel density for crisp rendering
   
   // Add custom slider styling
   addSliderStyles();
   
-  // Create control panel across bottom - CENTERED
-  var controlY = canvasHeight - 35; // Position in bottom strip
+  // Create control panel - 9 COLUMNS
+  // Column 1: Style dropdown
+  // Columns 2-8: 2 sliders each (stacked vertically)
+  // Column 9: Regenerate button
+  
+  var controlY1 = canvasHeight - 70; // Top row
+  var controlY2 = canvasHeight - 35; // Bottom row
   var sliderWidth = 80;
-  var spacing = 100; // Horizontal spacing between controls
+  var columnWidth = 110; // Width of each column
+  var fontSize = '11px';
   
-  // Calculate total width needed for all controls (9 sliders + 1 button)
-  var totalControlWidth = (spacing * 9) + sliderWidth; // 9 gaps + 1 final control width
-  var startX = (canvasWidth - totalControlWidth) / 2; // Center the controls
+  // Calculate centered starting position
+  var totalColumns = 9;
+  var totalWidth = (totalColumns - 1) * columnWidth;
+  var startX = (canvasWidth - totalWidth) / 2;
   
-  // Placement mode dropdown
-  createP('placement').position(startX, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
+  // COLUMN 1: Style dropdown (vertically centered, no label)
+  var styleY = canvasHeight - 52; // Centered between the two rows
   placementModeSelect = createSelect();
-  placementModeSelect.position(startX, controlY + 15);
+  placementModeSelect.position(startX, styleY);
   placementModeSelect.option('Random');
   placementModeSelect.option('Rule of Thirds');
   placementModeSelect.option('Radial');
@@ -131,69 +158,106 @@ function setup() {
   placementModeSelect.option('Circle Ring');
   placementModeSelect.option('Scattered Clusters');
   placementModeSelect.option('Golden Ratio');
-  placementModeSelect.style('width', sliderWidth + 'px');
+  placementModeSelect.style('width', '100px');
   placementModeSelect.changed(generateRectangles);
   
-  // Number of back rectangles
-  createP('back elements').position(startX + spacing, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
+  // COLUMN 2: back elements (top) / back shade (bottom)
+  createP('back elements').position(startX + columnWidth, controlY1).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
   numBackSlider = createSlider(2, 25, 5);
-  numBackSlider.position(startX + spacing, controlY + 15);
+  numBackSlider.position(startX + columnWidth, controlY1 + 15);
   numBackSlider.style('width', sliderWidth + 'px');
   numBackSlider.input(adjustBackCount);
   
-  // Number of front rectangles
-  createP('front elements').position(startX + spacing * 2, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
+  createP('back shade').position(startX + columnWidth, controlY2).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
+  backDarknessSlider = createSlider(0, 100, 40);
+  backDarknessSlider.position(startX + columnWidth, controlY2 + 15);
+  backDarknessSlider.style('width', sliderWidth + 'px');
+  backDarknessSlider.input(updateBackColors);
+  
+  // COLUMN 3: middle elements (top) / middle brightness (bottom)
+  createP('middle elements').position(startX + columnWidth * 2, controlY1).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
+  numMiddleSlider = createSlider(2, 25, 5);
+  numMiddleSlider.position(startX + columnWidth * 2, controlY1 + 15);
+  numMiddleSlider.style('width', sliderWidth + 'px');
+  numMiddleSlider.input(adjustMiddleCount);
+  
+  createP('middle brightness').position(startX + columnWidth * 2, controlY2).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
+  middleGraySlider = createSlider(100, 220, 150);
+  middleGraySlider.position(startX + columnWidth * 2, controlY2 + 15);
+  middleGraySlider.style('width', sliderWidth + 'px');
+  middleGraySlider.input(updateMiddleColors);
+  
+  // COLUMN 4: front elements (top) / color shift (bottom)
+  createP('front elements').position(startX + columnWidth * 3, controlY1).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
   numFrontSlider = createSlider(2, 25, 5);
-  numFrontSlider.position(startX + spacing * 2, controlY + 15);
+  numFrontSlider.position(startX + columnWidth * 3, controlY1 + 15);
   numFrontSlider.style('width', sliderWidth + 'px');
   numFrontSlider.input(adjustFrontCount);
   
-  // Back layer max size
-  createP('back max size').position(startX + spacing * 3, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
+  createP('color shift').position(startX + columnWidth * 3, controlY2).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
+  colorShiftSlider = createSlider(0, 360, 0);
+  colorShiftSlider.position(startX + columnWidth * 3, controlY2 + 15);
+  colorShiftSlider.style('width', sliderWidth + 'px');
+  colorShiftSlider.input(function() {
+    updateBackColors();
+    updateFrontColors();
+  });
+  
+  // COLUMN 5: back size (top) / antenna density (bottom)
+  createP('back size').position(startX + columnWidth * 4, controlY1).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
   backSizeSlider = createSlider(100, 600, 400);
-  backSizeSlider.position(startX + spacing * 3, controlY + 15);
+  backSizeSlider.position(startX + columnWidth * 4, controlY1 + 15);
   backSizeSlider.style('width', sliderWidth + 'px');
   backSizeSlider.input(updateBackSizes);
   
-  // Front layer max size
-  createP('front max size').position(startX + spacing * 4, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
+  createP('antenna density').position(startX + columnWidth * 4, controlY2).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
+  antennaDensitySlider = createSlider(0, 100, 30);
+  antennaDensitySlider.position(startX + columnWidth * 4, controlY2 + 15);
+  antennaDensitySlider.style('width', sliderWidth + 'px');
+  antennaDensitySlider.input(regenerateAntennas);
+  
+  // COLUMN 6: middle size (top) / antenna length (bottom)
+  createP('middle size').position(startX + columnWidth * 5, controlY1).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
+  middleSizeSlider = createSlider(75, 500, 300);
+  middleSizeSlider.position(startX + columnWidth * 5, controlY1 + 15);
+  middleSizeSlider.style('width', sliderWidth + 'px');
+  middleSizeSlider.input(updateMiddleSizes);
+  
+  createP('antenna length').position(startX + columnWidth * 5, controlY2).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
+  antennaLengthSlider = createSlider(50, 200, 100);
+  antennaLengthSlider.position(startX + columnWidth * 5, controlY2 + 15);
+  antennaLengthSlider.style('width', sliderWidth + 'px');
+  antennaLengthSlider.input(regenerateAntennas);
+  
+  // COLUMN 7: front size (top) / antenna RPM (bottom)
+  createP('front size').position(startX + columnWidth * 6, controlY1).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
   frontSizeSlider = createSlider(50, 400, 250);
-  frontSizeSlider.position(startX + spacing * 4, controlY + 15);
+  frontSizeSlider.position(startX + columnWidth * 6, controlY1 + 15);
   frontSizeSlider.style('width', sliderWidth + 'px');
   frontSizeSlider.input(updateFrontSizes);
   
-  // Corner radius
-  createP('corner radius').position(startX + spacing * 5, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
+  createP('antenna RPM').position(startX + columnWidth * 6, controlY2).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
+  antennaSpeedSlider = createSlider(1, 10, 3);
+  antennaSpeedSlider.position(startX + columnWidth * 6, controlY2 + 15);
+  antennaSpeedSlider.style('width', sliderWidth + 'px');
+  
+  // COLUMN 8: corner radius (top) / shadow offset (bottom)
+  createP('corner radius').position(startX + columnWidth * 7, controlY1).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
   cornerRadiusSlider = createSlider(0, 50, 10);
-  cornerRadiusSlider.position(startX + spacing * 5, controlY + 15);
+  cornerRadiusSlider.position(startX + columnWidth * 7, controlY1 + 15);
   cornerRadiusSlider.style('width', sliderWidth + 'px');
   
-  // Shadow offset
-  createP('shadow offset').position(startX + spacing * 6, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
+  createP('shadow offset').position(startX + columnWidth * 7, controlY2).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', fontSize);
   shadowSlider = createSlider(0, 30, 15);
-  shadowSlider.position(startX + spacing * 6, controlY + 15);
+  shadowSlider.position(startX + columnWidth * 7, controlY2 + 15);
   shadowSlider.style('width', sliderWidth + 'px');
   
-  // Back layer gray value
-  createP('back layer gray').position(startX + spacing * 7, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
-  backGraySlider = createSlider(100, 220, 180);
-  backGraySlider.position(startX + spacing * 7, controlY + 15);
-  backGraySlider.style('width', sliderWidth + 'px');
-  backGraySlider.input(updateBackColors);
-  
-  // Color shift
-  createP('color shift').position(startX + spacing * 8, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
-  colorShiftSlider = createSlider(0, 360, 0);
-  colorShiftSlider.position(startX + spacing * 8, controlY + 15);
-  colorShiftSlider.style('width', sliderWidth + 'px');
-  colorShiftSlider.input(updateFrontColors);
-  
-  // Refresh button
-  createP('regenerate').position(startX + spacing * 9, controlY).style('color', 'black').style('margin', '0').style('font-family', 'Helvetica, Arial, sans-serif').style('font-size', '9px');
-  refreshButton = createButton('⟳');
-  refreshButton.position(startX + spacing * 9, controlY + 15);
-  refreshButton.style('width', sliderWidth + 'px');
-  refreshButton.style('height', '20px');
+  // COLUMN 9: Regenerate button (vertically centered, label inside button)
+  var regenY = canvasHeight - 52; // Centered between the two rows
+  refreshButton = createButton('regenerate');
+  refreshButton.position(startX + columnWidth * 8, regenY);
+  refreshButton.style('width', '100px');
+  refreshButton.style('height', '24px');
   refreshButton.mousePressed(generateRectangles);
   
   generateRectangles();
@@ -214,9 +278,9 @@ function draw() {
     drawDropShadow(rectangle, centerX, centerY, cornerRad);
   }
   
-  // BACK LAYER - Draw tangent lines (WHITE)
-  stroke(255);
-  strokeWeight(1);
+  // BACK LAYER - Draw tangent lines (BLACK)
+  stroke(0);
+  strokeWeight(2);
   for (var i = 0; i < backRectangles.length; i++) {
     var rectangle = backRectangles[i];
     var nextRectangle = backRectangles[(i + 1) % backRectangles.length];
@@ -228,23 +292,49 @@ function draw() {
     }
   }
   
-  // BACK LAYER - Draw rectangles with BLACK stroke
-  stroke(0);
-  strokeWeight(1);
-  for (var i = 0; i < backRectangles.length; i++) {
-    var rectangle = backRectangles[i];
-    fill(rectangle.color);
-    rect(rectangle.x, rectangle.y, rectangle.width, rectangle.height, cornerRad);
-  }
-  
-  // Draw back rectangle fills again (on top of lines)
+  // BACK LAYER - Draw rectangles
   for (var i = 0; i < backRectangles.length; i++) {
     var rectangle = backRectangles[i];
     fill(rectangle.color);
     stroke(0);
-    strokeWeight(1);
+    strokeWeight(2);
     rect(rectangle.x, rectangle.y, rectangle.width, rectangle.height, cornerRad);
   }
+  
+  // BACK LAYER - Draw antennas
+  drawLayerAntennas(backRectangles);
+  
+  // MIDDLE LAYER - Draw drop shadows first (NEW)
+  for (var i = 0; i < middleRectangles.length; i++) {
+    var rectangle = middleRectangles[i];
+    drawDropShadow(rectangle, centerX, centerY, cornerRad);
+  }
+  
+  // MIDDLE LAYER - Draw tangent lines (BLACK) (NEW)
+  stroke(0);
+  strokeWeight(2);
+  for (var i = 0; i < middleRectangles.length; i++) {
+    var rectangle = middleRectangles[i];
+    var nextRectangle = middleRectangles[(i + 1) % middleRectangles.length];
+    var tangents = calculateCommonTangents(rectangle, nextRectangle);
+    for (var k = 0; k < tangents.length; k += 2) {
+      var tangentA = tangents[k];
+      var tangentB = tangents[k + 1];
+      line(tangentA.x, tangentA.y, tangentB.x, tangentB.y);
+    }
+  }
+  
+  // MIDDLE LAYER - Draw rectangles (NEW)
+  for (var i = 0; i < middleRectangles.length; i++) {
+    var rectangle = middleRectangles[i];
+    fill(rectangle.color);
+    stroke(0);
+    strokeWeight(2);
+    rect(rectangle.x, rectangle.y, rectangle.width, rectangle.height, cornerRad);
+  }
+  
+  // MIDDLE LAYER - Draw antennas
+  drawLayerAntennas(middleRectangles);
   
   // FRONT LAYER - Draw drop shadows first
   for (var i = 0; i < frontRectangles.length; i++) {
@@ -254,7 +344,7 @@ function draw() {
   
   // FRONT LAYER - Draw tangent lines (BLACK)
   stroke(0);
-  strokeWeight(1);
+  strokeWeight(2);
   for (var i = 0; i < frontRectangles.length; i++) {
     var rectangle = frontRectangles[i];
     var nextRectangle = frontRectangles[(i + 1) % frontRectangles.length];
@@ -264,216 +354,60 @@ function draw() {
       var tangentB = tangents[k + 1];
       line(tangentA.x, tangentA.y, tangentB.x, tangentB.y);
     }
-    fill(rectangle.color);
-    rect(rectangle.x, rectangle.y, rectangle.width, rectangle.height, cornerRad);
   }
   
-  // Draw front rectangle fills again (on top of lines)
+  // FRONT LAYER - Draw rectangles
   for (var i = 0; i < frontRectangles.length; i++) {
     var rectangle = frontRectangles[i];
     fill(rectangle.color);
+    stroke(0);
+    strokeWeight(2);
     rect(rectangle.x, rectangle.y, rectangle.width, rectangle.height, cornerRad);
   }
   
-  // Draw white control strip at bottom - MOVED TO END TO STAY ON TOP
-  fill(255);
-  noStroke();
-  rect(0, height - 40, width, 40);
+  // FRONT LAYER - Draw antennas
+  drawLayerAntennas(frontRectangles);
 }
 
 function drawDropShadow(rectangle, centerX, centerY, cornerRad) {
+  var shadowOffset = shadowSlider.value();
+  
   var rectCenterX = rectangle.x + rectangle.width / 2;
   var rectCenterY = rectangle.y + rectangle.height / 2;
   
-  var dirX = centerX - rectCenterX;
-  var dirY = centerY - rectCenterY;
+  // Calculate angle from vanishing point to rectangle center
+  var angle = atan2(rectCenterY - vanishingPoint.y, rectCenterX - vanishingPoint.x);
   
-  var distance = sqrt(dirX * dirX + dirY * dirY);
-  if (distance > 0) {
-    var shadowAmount = shadowSlider.value();
-    dirX = (dirX / distance) * shadowAmount;
-    dirY = (dirY / distance) * shadowAmount;
-  }
+  var shadowX = rectangle.x + cos(angle) * shadowOffset;
+  var shadowY = rectangle.y + sin(angle) * shadowOffset;
   
-  fill(0);
-  stroke(0);
-  strokeWeight(1);
-  rect(rectangle.x + dirX, rectangle.y + dirY, rectangle.width, rectangle.height, cornerRad);
-}
-
-function generatePosition(mode, maxY, index, total) {
-  var x, y;
-  
-  switch(mode) {
-    case 'Random':
-      x = random(width);
-      y = random(maxY);
-      break;
-      
-    case 'Rule of Thirds':
-      var gridPoints = [
-        {x: width/3, y: maxY/3},
-        {x: width*2/3, y: maxY/3},
-        {x: width/3, y: maxY*2/3},
-        {x: width*2/3, y: maxY*2/3},
-        {x: width/2, y: maxY/2}
-      ];
-      var targetPoint = gridPoints[floor(random(gridPoints.length))];
-      x = targetPoint.x + randomGaussian(0, 80);
-      y = targetPoint.y + randomGaussian(0, 80);
-      break;
-      
-    case 'Radial':
-      var angle = (index / total) * TWO_PI;
-      var radius = random(100, 400);
-      x = width/2 + cos(angle) * radius;
-      y = maxY/2 + sin(angle) * radius;
-      break;
-      
-    case 'Grid + Jitter':
-      var cols = ceil(sqrt(total));
-      var rows = ceil(total / cols);
-      var gridX = (index % cols) / cols * width;
-      var gridY = floor(index / cols) / rows * maxY;
-      x = gridX + random(-50, 50);
-      y = gridY + random(-50, 50);
-      break;
-      
-    case 'Symmetrical':
-      if (index % 2 === 0) {
-        x = random(0, width/2);
-      } else {
-        x = width - (backRectangles[index-1]?.x || random(0, width/2));
-      }
-      y = random(maxY);
-      break;
-      
-    case 'Diagonal Bias':
-      var t = random();
-      x = lerp(0, width, t) + randomGaussian(0, 60);
-      y = lerp(0, maxY, t) + randomGaussian(0, 60);
-      break;
-      
-    case 'Center Cluster':
-      x = width/2 + randomGaussian(0, width/5);
-      y = maxY/2 + randomGaussian(0, maxY/5);
-      break;
-      
-    case 'Edge Focus':
-      if (random() < 0.5) {
-        x = random() < 0.5 ? random(0, width*0.25) : random(width*0.75, width);
-      } else {
-        x = random(width);
-      }
-      if (random() < 0.5) {
-        y = random() < 0.5 ? random(0, maxY*0.25) : random(maxY*0.75, maxY);
-      } else {
-        y = random(maxY);
-      }
-      break;
-      
-    case 'Horizontal Bands':
-      var numBands = 3;
-      var bandHeight = maxY / numBands;
-      var band = floor(random(numBands));
-      x = random(width);
-      y = band * bandHeight + random(bandHeight) * 0.8 + bandHeight * 0.1;
-      break;
-      
-    case 'Vertical Columns':
-      var numCols = 4;
-      var colWidth = width / numCols;
-      var col = floor(random(numCols));
-      x = col * colWidth + random(colWidth) * 0.8 + colWidth * 0.1;
-      y = random(maxY);
-      break;
-      
-    case 'Fibonacci Spiral':
-      var phi = 1.618033988749895;
-      var theta = index * 137.5 * (PI / 180);
-      var r = 20 * sqrt(index);
-      x = width/2 + r * cos(theta);
-      y = maxY/2 + r * sin(theta);
-      break;
-      
-    case 'Corners Focus':
-      var corners = [
-        {x: width * 0.15, y: maxY * 0.15},
-        {x: width * 0.85, y: maxY * 0.15},
-        {x: width * 0.15, y: maxY * 0.85},
-        {x: width * 0.85, y: maxY * 0.85}
-      ];
-      var corner = corners[floor(random(corners.length))];
-      x = corner.x + randomGaussian(0, 60);
-      y = corner.y + randomGaussian(0, 60);
-      break;
-      
-    case 'X Pattern':
-      if (random() < 0.5) {
-        var t1 = random();
-        x = lerp(0, width, t1) + randomGaussian(0, 40);
-        y = lerp(0, maxY, t1) + randomGaussian(0, 40);
-      } else {
-        var t2 = random();
-        x = lerp(width, 0, t2) + randomGaussian(0, 40);
-        y = lerp(0, maxY, t2) + randomGaussian(0, 40);
-      }
-      break;
-      
-    case 'Circle Ring':
-      var angle2 = random(TWO_PI);
-      var ringRadius = random(200, 350);
-      x = width/2 + cos(angle2) * ringRadius;
-      y = maxY/2 + sin(angle2) * ringRadius;
-      break;
-      
-    case 'Scattered Clusters':
-      var clusterPoints = [
-        {x: width * 0.25, y: maxY * 0.3},
-        {x: width * 0.75, y: maxY * 0.3},
-        {x: width * 0.5, y: maxY * 0.6},
-        {x: width * 0.2, y: maxY * 0.8},
-        {x: width * 0.8, y: maxY * 0.8}
-      ];
-      var cluster = clusterPoints[floor(random(clusterPoints.length))];
-      x = cluster.x + randomGaussian(0, 70);
-      y = cluster.y + randomGaussian(0, 70);
-      break;
-      
-    case 'Golden Ratio':
-      var goldenX = [width * 0.382, width * 0.618];
-      var goldenY = [maxY * 0.382, maxY * 0.618];
-      var gx = goldenX[floor(random(2))];
-      var gy = goldenY[floor(random(2))];
-      x = gx + randomGaussian(0, 60);
-      y = gy + randomGaussian(0, 60);
-      break;
-      
-    default:
-      x = random(width);
-      y = random(maxY);
-  }
-  
-  x = constrain(x, 0, width);
-  y = constrain(y, 0, maxY);
-  
-  return {x: x, y: y};
+  fill(0, 0, 0, 80);
+  noStroke(); // Remove black stroke
+  rect(shadowX, shadowY, rectangle.width, rectangle.height, cornerRad);
 }
 
 function generateRectangles() {
   backRectangles = [];
+  middleRectangles = []; // NEW
   frontRectangles = [];
   
-  hueOffset = random(360);
+  // Set a new random vanishing point within the canvas
+  var maxY = height - 40; // Drawing area height
+  vanishingPoint = {
+    x: random(width * 0.2, width * 0.8),
+    y: random(maxY * 0.2, maxY * 0.8)
+  };
   
   var numBack = numBackSlider.value();
+  var numMiddle = numMiddleSlider.value(); // NEW
   var numFront = numFrontSlider.value();
   var backMaxSize = backSizeSlider.value();
+  var middleMaxSize = middleSizeSlider.value(); // NEW
   var frontMaxSize = frontSizeSlider.value();
-  var grayValue = backGraySlider.value();
-  var maxY = height - 40; // Drawing area height (excluding control strip)
+  var middleGrayValue = middleGraySlider.value(); // NEW
   var mode = placementModeSelect.value();
   
+  // BACK LAYER
   for (var i = 0; i < numBack; i++) {
     var pos = generatePosition(mode, maxY, i, numBack);
     var x = pos.x;
@@ -490,11 +424,41 @@ function generateRectangles() {
       sizeType = random() < 0.5 ? 'SMALL' : 'BEAM';
     }
     
-    var grayVariation = random(-30, 30);
-    var individualGray = constrain(grayValue + grayVariation, 100, 220);
-    var rectangleColor = color(individualGray, individualGray, individualGray);
+    // Use color instead of gray
+    var rectangleColor = color(x / width * 255, y / maxY * 255, 150);
     
     backRectangles.push({ 
+      x: x, 
+      y: y, 
+      sizeType: sizeType,
+      sizeRatioW: random(),
+      sizeRatioH: random(),
+      color: rectangleColor 
+    });
+  }
+  
+  // MIDDLE LAYER (NEW)
+  for (var i = 0; i < numMiddle; i++) {
+    var pos = generatePosition(mode, maxY, i, numMiddle);
+    var x = pos.x;
+    var y = pos.y;
+    
+    var sizeCategory = random();
+    var sizeType;
+    
+    if (sizeCategory < 0.25) {
+      sizeType = 'LARGE';
+    } else if (sizeCategory < 0.55) {
+      sizeType = 'MEDIUM';
+    } else {
+      sizeType = random() < 0.5 ? 'SMALL' : 'PANEL';
+    }
+    
+    var grayVariation = random(-30, 30);
+    var individualGray = constrain(middleGrayValue + grayVariation, 100, 220);
+    var rectangleColor = color(individualGray, individualGray, individualGray);
+    
+    middleRectangles.push({ 
       x: x, 
       y: y, 
       sizeType: sizeType,
@@ -505,8 +469,7 @@ function generateRectangles() {
     });
   }
   
-  updateBackSizes();
-  
+  // FRONT LAYER
   for (var i = 0; i < numFront; i++) {
     var pos = generatePosition(mode, maxY, i, numFront);
     var x = pos.x;
@@ -537,7 +500,150 @@ function generateRectangles() {
     });
   }
   
+  updateBackSizes();
+  updateMiddleSizes(); // NEW
   updateFrontSizes();
+  updateBackColors(); // Apply darkness to back layer
+  updateFrontColors();
+  
+  // Generate antennas for all layers
+  generateAntennas();
+}
+
+function generatePosition(mode, maxY, index, total) {
+  var x, y;
+  var margin = 50;
+  
+  if (mode === 'Random') {
+    x = random(margin, width - margin);
+    y = random(margin, maxY - margin);
+  } else if (mode === 'Rule of Thirds') {
+    var gridX = [width * 0.333, width * 0.5, width * 0.667];
+    var gridY = [maxY * 0.333, maxY * 0.5, maxY * 0.667];
+    x = random(gridX) + random(-50, 50);
+    y = random(gridY) + random(-50, 50);
+  } else if (mode === 'Radial') {
+    var angle = (index / total) * TWO_PI;
+    var radius = min(width, maxY) * 0.3 + random(-50, 50);
+    x = width/2 + cos(angle) * radius;
+    y = maxY/2 + sin(angle) * radius;
+  } else if (mode === 'Grid + Jitter') {
+    var cols = floor(sqrt(total)) + 1;
+    var cellW = (width - margin * 2) / cols;
+    var cellH = (maxY - margin * 2) / cols;
+    var col = index % cols;
+    var row = floor(index / cols);
+    x = margin + col * cellW + cellW/2 + random(-cellW * 0.3, cellW * 0.3);
+    y = margin + row * cellH + cellH/2 + random(-cellH * 0.3, cellH * 0.3);
+  } else if (mode === 'Symmetrical') {
+    var halfTotal = ceil(total / 2);
+    if (index < halfTotal) {
+      x = random(margin, width/2 - margin);
+      y = random(margin, maxY - margin);
+    } else {
+      var mirrorIdx = index - halfTotal;
+      x = width - (random(margin, width/2 - margin));
+      y = random(margin, maxY - margin);
+    }
+  } else if (mode === 'Diagonal Bias') {
+    var t = index / total;
+    x = lerp(margin, width - margin, t) + random(-100, 100);
+    y = lerp(margin, maxY - margin, t) + random(-100, 100);
+  } else if (mode === 'Center Cluster') {
+    var radius = random(0, min(width, maxY) * 0.25);
+    var angle = random(TWO_PI);
+    x = width/2 + cos(angle) * radius;
+    y = maxY/2 + sin(angle) * radius;
+  } else if (mode === 'Edge Focus') {
+    var edge = floor(random(4));
+    if (edge === 0) { // top
+      x = random(margin, width - margin);
+      y = random(margin, maxY * 0.25);
+    } else if (edge === 1) { // right
+      x = random(width * 0.75, width - margin);
+      y = random(margin, maxY - margin);
+    } else if (edge === 2) { // bottom
+      x = random(margin, width - margin);
+      y = random(maxY * 0.75, maxY - margin);
+    } else { // left
+      x = random(margin, width * 0.25);
+      y = random(margin, maxY - margin);
+    }
+  } else if (mode === 'Horizontal Bands') {
+    var numBands = 3;
+    var band = floor(random(numBands));
+    var bandHeight = maxY / numBands;
+    x = random(margin, width - margin);
+    y = band * bandHeight + random(margin, bandHeight - margin);
+  } else if (mode === 'Vertical Columns') {
+    var numCols = 3;
+    var col = floor(random(numCols));
+    var colWidth = width / numCols;
+    x = col * colWidth + random(margin, colWidth - margin);
+    y = random(margin, maxY - margin);
+  } else if (mode === 'Fibonacci Spiral') {
+    var phi = (1 + sqrt(5)) / 2;
+    var angle = index * 137.5 * (PI / 180);
+    var radius = sqrt(index) * 20;
+    x = width/2 + cos(angle) * radius;
+    y = maxY/2 + sin(angle) * radius;
+  } else if (mode === 'Corners Focus') {
+    var corner = floor(random(4));
+    var cornerDist = random(0, min(width, maxY) * 0.3);
+    var cornerAngle = random(TWO_PI);
+    if (corner === 0) { // top-left
+      x = margin + cos(cornerAngle) * cornerDist;
+      y = margin + sin(cornerAngle) * cornerDist;
+    } else if (corner === 1) { // top-right
+      x = width - margin + cos(cornerAngle) * cornerDist;
+      y = margin + sin(cornerAngle) * cornerDist;
+    } else if (corner === 2) { // bottom-right
+      x = width - margin + cos(cornerAngle) * cornerDist;
+      y = maxY - margin + sin(cornerAngle) * cornerDist;
+    } else { // bottom-left
+      x = margin + cos(cornerAngle) * cornerDist;
+      y = maxY - margin + sin(cornerAngle) * cornerDist;
+    }
+  } else if (mode === 'X Pattern') {
+    var t = index / total;
+    if (random() < 0.5) {
+      x = lerp(margin, width - margin, t) + random(-50, 50);
+      y = lerp(margin, maxY - margin, t) + random(-50, 50);
+    } else {
+      x = lerp(width - margin, margin, t) + random(-50, 50);
+      y = lerp(margin, maxY - margin, t) + random(-50, 50);
+    }
+  } else if (mode === 'Circle Ring') {
+    var angle = (index / total) * TWO_PI + random(-0.3, 0.3);
+    var radius = min(width, maxY) * 0.35;
+    x = width/2 + cos(angle) * radius;
+    y = maxY/2 + sin(angle) * radius;
+  } else if (mode === 'Scattered Clusters') {
+    var numClusters = 4;
+    var cluster = floor(random(numClusters));
+    var clusterCenters = [
+      {x: width * 0.25, y: maxY * 0.25},
+      {x: width * 0.75, y: maxY * 0.25},
+      {x: width * 0.25, y: maxY * 0.75},
+      {x: width * 0.75, y: maxY * 0.75}
+    ];
+    var center = clusterCenters[cluster];
+    var clusterRadius = min(width, maxY) * 0.15;
+    var angle = random(TWO_PI);
+    var radius = random(0, clusterRadius);
+    x = center.x + cos(angle) * radius;
+    y = center.y + sin(angle) * radius;
+  } else if (mode === 'Golden Ratio') {
+    var phi = (1 + sqrt(5)) / 2;
+    var t = index / total;
+    x = lerp(margin, width - margin, t / phi) + random(-50, 50);
+    y = lerp(margin, maxY - margin, (t * phi) % 1) + random(-50, 50);
+  } else {
+    x = random(margin, width - margin);
+    y = random(margin, maxY - margin);
+  }
+  
+  return {x: x, y: y};
 }
 
 function updateBackSizes() {
@@ -547,18 +653,44 @@ function updateBackSizes() {
     var rect = backRectangles[i];
     var rectWidth, rectHeight;
     
-    if (rect.sizeType === 'LARGE') {
-      rectWidth = lerp(backMaxSize * 0.5, backMaxSize, rect.sizeRatioW);
-      rectHeight = lerp(backMaxSize * 0.4, backMaxSize * 0.9, rect.sizeRatioH);
+    if (rect.sizeType === 'SMALL') {
+      rectWidth = lerp(backMaxSize * 0.2, backMaxSize * 0.45, rect.sizeRatioW);
+      rectHeight = lerp(backMaxSize * 0.2, backMaxSize * 0.45, rect.sizeRatioH);
     } else if (rect.sizeType === 'MEDIUM') {
-      rectWidth = lerp(backMaxSize * 0.24, backMaxSize * 0.5, rect.sizeRatioW);
-      rectHeight = lerp(backMaxSize * 0.2, backMaxSize * 0.5, rect.sizeRatioH);
-    } else if (rect.sizeType === 'SMALL') {
-      rectWidth = lerp(backMaxSize * 0.08, backMaxSize * 0.24, rect.sizeRatioW);
-      rectHeight = lerp(backMaxSize * 0.08, backMaxSize * 0.24, rect.sizeRatioH);
+      rectWidth = lerp(backMaxSize * 0.45, backMaxSize * 0.75, rect.sizeRatioW);
+      rectHeight = lerp(backMaxSize * 0.35, backMaxSize * 0.65, rect.sizeRatioH);
+    } else if (rect.sizeType === 'BEAM') {
+      rectWidth = lerp(backMaxSize * 0.65, backMaxSize * 1.3, rect.sizeRatioW);
+      rectHeight = lerp(35, backMaxSize * 0.35, rect.sizeRatioH);
     } else {
-      rectWidth = lerp(backMaxSize * 0.3, backMaxSize * 0.8, rect.sizeRatioW);
-      rectHeight = lerp(20, 60, rect.sizeRatioH);
+      rectWidth = lerp(backMaxSize * 0.65, backMaxSize * 1.05, rect.sizeRatioW);
+      rectHeight = lerp(backMaxSize * 0.55, backMaxSize * 0.95, rect.sizeRatioH);
+    }
+    
+    rect.width = rectWidth;
+    rect.height = rectHeight;
+  }
+}
+
+function updateMiddleSizes() { // NEW
+  var middleMaxSize = middleSizeSlider.value();
+  
+  for (var i = 0; i < middleRectangles.length; i++) {
+    var rect = middleRectangles[i];
+    var rectWidth, rectHeight;
+    
+    if (rect.sizeType === 'SMALL') {
+      rectWidth = lerp(middleMaxSize * 0.2, middleMaxSize * 0.48, rect.sizeRatioW);
+      rectHeight = lerp(middleMaxSize * 0.2, middleMaxSize * 0.48, rect.sizeRatioH);
+    } else if (rect.sizeType === 'MEDIUM') {
+      rectWidth = lerp(middleMaxSize * 0.48, middleMaxSize * 0.8, rect.sizeRatioW);
+      rectHeight = lerp(middleMaxSize * 0.4, middleMaxSize * 0.72, rect.sizeRatioH);
+    } else if (rect.sizeType === 'PANEL') {
+      rectWidth = lerp(middleMaxSize * 0.72, middleMaxSize * 1.4, rect.sizeRatioW);
+      rectHeight = lerp(40, middleMaxSize * 0.4, rect.sizeRatioH);
+    } else {
+      rectWidth = lerp(middleMaxSize * 0.72, middleMaxSize * 1.12, rect.sizeRatioW);
+      rectHeight = lerp(middleMaxSize * 0.64, middleMaxSize * 1.04, rect.sizeRatioH);
     }
     
     rect.width = rectWidth;
@@ -574,8 +706,8 @@ function updateFrontSizes() {
     var rectWidth, rectHeight;
     
     if (rect.sizeType === 'TINY') {
-      rectWidth = lerp(20, frontMaxSize * 0.2, rect.sizeRatioW);
-      rectHeight = lerp(20, frontMaxSize * 0.32, rect.sizeRatioH);
+      rectWidth = lerp(frontMaxSize * 0.1, frontMaxSize * 0.22, rect.sizeRatioW);
+      rectHeight = lerp(frontMaxSize * 0.1, frontMaxSize * 0.22, rect.sizeRatioH);
     } else if (rect.sizeType === 'SMALL') {
       rectWidth = lerp(frontMaxSize * 0.2, frontMaxSize * 0.48, rect.sizeRatioW);
       rectHeight = lerp(frontMaxSize * 0.2, frontMaxSize * 0.48, rect.sizeRatioH);
@@ -598,7 +730,6 @@ function updateFrontSizes() {
 function adjustBackCount() {
   var targetCount = numBackSlider.value();
   var currentCount = backRectangles.length;
-  var grayValue = backGraySlider.value();
   var backMaxSize = backSizeSlider.value();
   var maxY = height - 40; // Drawing area height
   var mode = placementModeSelect.value();
@@ -620,11 +751,53 @@ function adjustBackCount() {
         sizeType = random() < 0.5 ? 'SMALL' : 'BEAM';
       }
       
+      var rectangleColor = color(x / width * 255, y / maxY * 255, 150);
+      
+      backRectangles.push({ 
+        x: x, 
+        y: y, 
+        sizeType: sizeType,
+        sizeRatioW: random(),
+        sizeRatioH: random(),
+        color: rectangleColor 
+      });
+    }
+    updateBackSizes();
+  } else if (targetCount < currentCount) {
+    backRectangles.splice(targetCount);
+  }
+}
+
+function adjustMiddleCount() { // NEW
+  var targetCount = numMiddleSlider.value();
+  var currentCount = middleRectangles.length;
+  var grayValue = middleGraySlider.value();
+  var middleMaxSize = middleSizeSlider.value();
+  var maxY = height - 40; // Drawing area height
+  var mode = placementModeSelect.value();
+  
+  if (targetCount > currentCount) {
+    for (var i = currentCount; i < targetCount; i++) {
+      var pos = generatePosition(mode, maxY, i, targetCount);
+      var x = pos.x;
+      var y = pos.y;
+      
+      var sizeCategory = random();
+      var sizeType;
+      
+      if (sizeCategory < 0.25) {
+        sizeType = 'LARGE';
+      } else if (sizeCategory < 0.55) {
+        sizeType = 'MEDIUM';
+      } else {
+        sizeType = random() < 0.5 ? 'SMALL' : 'PANEL';
+      }
+      
       var grayVariation = random(-30, 30);
       var individualGray = constrain(grayValue + grayVariation, 100, 220);
       var rectangleColor = color(individualGray, individualGray, individualGray);
       
-      backRectangles.push({ 
+      middleRectangles.push({ 
         x: x, 
         y: y, 
         sizeType: sizeType,
@@ -634,9 +807,9 @@ function adjustBackCount() {
         color: rectangleColor 
       });
     }
-    updateBackSizes();
+    updateMiddleSizes();
   } else if (targetCount < currentCount) {
-    backRectangles.splice(targetCount);
+    middleRectangles.splice(targetCount);
   }
 }
 
@@ -684,9 +857,53 @@ function adjustFrontCount() {
 }
 
 function updateBackColors() {
-  var grayValue = backGraySlider.value();
+  var shiftAmount = colorShiftSlider.value();
+  var darknessAmount = backDarknessSlider.value() / 100; // 0 to 1 scale
+  var maxY = height - 40; // Drawing area height
+  
   for (var i = 0; i < backRectangles.length; i++) {
     var rect = backRectangles[i];
+    var x = rect.x;
+    var y = rect.y;
+    
+    var baseR = x / width * 255;
+    var baseG = y / maxY * 255;
+    var baseB = 150;
+    
+    var shiftPercent = shiftAmount / 360;
+    
+    var finalR, finalG, finalB;
+    
+    if (shiftPercent < 0.33) {
+      var t = shiftPercent * 3;
+      finalR = lerp(baseR, baseG, t);
+      finalG = lerp(baseG, baseB, t);
+      finalB = lerp(baseB, baseR, t);
+    } else if (shiftPercent < 0.67) {
+      var t = (shiftPercent - 0.33) * 3;
+      finalR = lerp(baseG, baseB, t);
+      finalG = lerp(baseB, baseR, t);
+      finalB = lerp(baseR, baseG, t);
+    } else {
+      var t = (shiftPercent - 0.67) * 3;
+      finalR = lerp(baseB, baseR, t);
+      finalG = lerp(baseR, baseG, t);
+      finalB = lerp(baseG, baseB, t);
+    }
+    
+    // Apply darkness by lerping towards black
+    finalR = finalR * (1 - darknessAmount);
+    finalG = finalG * (1 - darknessAmount);
+    finalB = finalB * (1 - darknessAmount);
+    
+    rect.color = color(finalR, finalG, finalB);
+  }
+}
+
+function updateMiddleColors() { // NEW
+  var grayValue = middleGraySlider.value();
+  for (var i = 0; i < middleRectangles.length; i++) {
+    var rect = middleRectangles[i];
     var individualGray = constrain(grayValue + rect.grayVariation, 100, 220);
     rect.color = color(individualGray, individualGray, individualGray);
   }
@@ -744,6 +961,117 @@ function calculateCommonTangents(rectangle1, rectangle2) {
   return [tangentPoint1, tangentPoint2];
 }
 
+// ANTENNA FUNCTIONS
+function generateAntennas() {
+  var density = antennaDensitySlider.value() / 100; // 0 to 1
+  var lengthMultiplier = antennaLengthSlider.value() / 100; // 0.5 to 2
+  
+  // Generate antennas for all layers
+  var allRects = [backRectangles, middleRectangles, frontRectangles];
+  
+  for (var layer of allRects) {
+    for (var rect of layer) {
+      // Decide if this rectangle gets an antenna based on density
+      if (random() < density) {
+        // 8 possible positions: 4 corners + 4 edge midpoints
+        // All offset inside by 15px from the edge
+        var offset = 15;
+        var position = floor(random(8));
+        var pivotX, pivotY;
+        
+        if (position === 0) { // top-left corner
+          pivotX = rect.x + offset;
+          pivotY = rect.y + offset;
+        } else if (position === 1) { // top-center
+          pivotX = rect.x + rect.width / 2;
+          pivotY = rect.y + offset;
+        } else if (position === 2) { // top-right corner
+          pivotX = rect.x + rect.width - offset;
+          pivotY = rect.y + offset;
+        } else if (position === 3) { // right-center
+          pivotX = rect.x + rect.width - offset;
+          pivotY = rect.y + rect.height / 2;
+        } else if (position === 4) { // bottom-right corner
+          pivotX = rect.x + rect.width - offset;
+          pivotY = rect.y + rect.height - offset;
+        } else if (position === 5) { // bottom-center
+          pivotX = rect.x + rect.width / 2;
+          pivotY = rect.y + rect.height - offset;
+        } else if (position === 6) { // bottom-left corner
+          pivotX = rect.x + offset;
+          pivotY = rect.y + rect.height - offset;
+        } else { // left-center
+          pivotX = rect.x + offset;
+          pivotY = rect.y + rect.height / 2;
+        }
+        
+        // Antenna length based on average of width and height
+        var baseLength = (rect.width + rect.height) / 2;
+        var antennaLength = baseLength * lengthMultiplier * random(0.8, 1.2);
+        
+        // Random starting angle
+        var startAngle = random(TWO_PI);
+        
+        // Random direction: CW (-1) or CCW (1)
+        var direction = random() < 0.5 ? 1 : -1;
+        
+        rect.antenna = {
+          pivotX: pivotX,
+          pivotY: pivotY,
+          length: antennaLength,
+          angle: startAngle,
+          direction: direction
+        };
+      } else {
+        rect.antenna = null;
+      }
+    }
+  }
+}
+
+function regenerateAntennas() {
+  // Just regenerate antennas without regenerating rectangles
+  generateAntennas();
+}
+
+function drawLayerAntennas(layer) {
+  var rpm = antennaSpeedSlider.value();
+  var radiansPerFrame = (rpm * TWO_PI) / (60 * 60); // Convert RPM to radians per frame (assuming 60fps)
+  
+  for (var rect of layer) {
+    if (rect.antenna) {
+      var ant = rect.antenna;
+      
+      // Update angle
+      ant.angle += radiansPerFrame * ant.direction;
+      
+      // Calculate end point
+      var endX = ant.pivotX + cos(ant.angle) * ant.length;
+      var endY = ant.pivotY + sin(ant.angle) * ant.length;
+      
+      // Draw antenna line with round cap (3pt stroke)
+      stroke(0);
+      strokeWeight(3);
+      strokeCap(ROUND);
+      line(ant.pivotX, ant.pivotY, endX, endY);
+      
+      // Draw pivot circle (dark gray with black stroke, 13px diameter)
+      fill(100);
+      stroke(0);
+      strokeWeight(2);
+      circle(ant.pivotX, ant.pivotY, 13);
+      
+      // Draw end cap circle
+      fill(0);
+      noStroke();
+      circle(endX, endY, 6);
+    }
+  }
+  
+  // Reset stroke cap to default
+  strokeCap(SQUARE);
+}
+
 function keyPressed() {
   if (key === 's' || key === 'S') {
     var timestamp = year() + "-" + month() + "-" + day() + "_" + hour() + "-" + minute() + "-" + second();
@@ -758,50 +1086,77 @@ function windowResized() {
   var canvasWidth = windowWidth;
   var canvasHeight = windowHeight;
   
-  var minWidth = 1000; // Increased to fit the new button
+  var minWidth = 1000;
   if (canvasWidth < minWidth) {
     canvasWidth = minWidth;
   }
   
   resizeCanvas(canvasWidth, canvasHeight);
   
-  // Reposition controls
-  var controlY = canvasHeight - 35;
+  // Reposition controls - 9 COLUMNS
+  var controlY1 = canvasHeight - 70;
+  var controlY2 = canvasHeight - 35;
   var sliderWidth = 80;
-  var spacing = 100;
-  var totalControlWidth = (spacing * 9) + sliderWidth;
-  var startX = (canvasWidth - totalControlWidth) / 2;
+  var columnWidth = 110;
+  var fontSize = '11px';
+  
+  var totalColumns = 9;
+  var totalWidth = (totalColumns - 1) * columnWidth;
+  var startX = (canvasWidth - totalWidth) / 2;
+  
+  var styleY = canvasHeight - 52;
+  var regenY = canvasHeight - 52;
   
   // Update all control positions
-  select('p').position(startX, controlY);
-  placementModeSelect.position(startX, controlY + 15);
+  var allParagraphs = selectAll('p');
   
-  selectAll('p')[1].position(startX + spacing, controlY);
-  numBackSlider.position(startX + spacing, controlY + 15);
+  // Column 1: Style dropdown (no label)
+  placementModeSelect.position(startX, styleY);
   
-  selectAll('p')[2].position(startX + spacing * 2, controlY);
-  numFrontSlider.position(startX + spacing * 2, controlY + 15);
+  // Column 2: back elements / back shade
+  allParagraphs[0].position(startX + columnWidth, controlY1);
+  numBackSlider.position(startX + columnWidth, controlY1 + 15);
+  allParagraphs[1].position(startX + columnWidth, controlY2);
+  backDarknessSlider.position(startX + columnWidth, controlY2 + 15);
   
-  selectAll('p')[3].position(startX + spacing * 3, controlY);
-  backSizeSlider.position(startX + spacing * 3, controlY + 15);
+  // Column 3: middle elements / middle brightness
+  allParagraphs[2].position(startX + columnWidth * 2, controlY1);
+  numMiddleSlider.position(startX + columnWidth * 2, controlY1 + 15);
+  allParagraphs[3].position(startX + columnWidth * 2, controlY2);
+  middleGraySlider.position(startX + columnWidth * 2, controlY2 + 15);
   
-  selectAll('p')[4].position(startX + spacing * 4, controlY);
-  frontSizeSlider.position(startX + spacing * 4, controlY + 15);
+  // Column 4: front elements / color shift
+  allParagraphs[4].position(startX + columnWidth * 3, controlY1);
+  numFrontSlider.position(startX + columnWidth * 3, controlY1 + 15);
+  allParagraphs[5].position(startX + columnWidth * 3, controlY2);
+  colorShiftSlider.position(startX + columnWidth * 3, controlY2 + 15);
   
-  selectAll('p')[5].position(startX + spacing * 5, controlY);
-  cornerRadiusSlider.position(startX + spacing * 5, controlY + 15);
+  // Column 5: back size / antenna density
+  allParagraphs[6].position(startX + columnWidth * 4, controlY1);
+  backSizeSlider.position(startX + columnWidth * 4, controlY1 + 15);
+  allParagraphs[7].position(startX + columnWidth * 4, controlY2);
+  antennaDensitySlider.position(startX + columnWidth * 4, controlY2 + 15);
   
-  selectAll('p')[6].position(startX + spacing * 6, controlY);
-  shadowSlider.position(startX + spacing * 6, controlY + 15);
+  // Column 6: middle size / antenna length
+  allParagraphs[8].position(startX + columnWidth * 5, controlY1);
+  middleSizeSlider.position(startX + columnWidth * 5, controlY1 + 15);
+  allParagraphs[9].position(startX + columnWidth * 5, controlY2);
+  antennaLengthSlider.position(startX + columnWidth * 5, controlY2 + 15);
   
-  selectAll('p')[7].position(startX + spacing * 7, controlY);
-  backGraySlider.position(startX + spacing * 7, controlY + 15);
+  // Column 7: front size / antenna RPM
+  allParagraphs[10].position(startX + columnWidth * 6, controlY1);
+  frontSizeSlider.position(startX + columnWidth * 6, controlY1 + 15);
+  allParagraphs[11].position(startX + columnWidth * 6, controlY2);
+  antennaSpeedSlider.position(startX + columnWidth * 6, controlY2 + 15);
   
-  selectAll('p')[8].position(startX + spacing * 8, controlY);
-  colorShiftSlider.position(startX + spacing * 8, controlY + 15);
+  // Column 8: corner radius / shadow offset
+  allParagraphs[12].position(startX + columnWidth * 7, controlY1);
+  cornerRadiusSlider.position(startX + columnWidth * 7, controlY1 + 15);
+  allParagraphs[13].position(startX + columnWidth * 7, controlY2);
+  shadowSlider.position(startX + columnWidth * 7, controlY2 + 15);
   
-  selectAll('p')[9].position(startX + spacing * 9, controlY);
-  refreshButton.position(startX + spacing * 9, controlY + 15);
+  // Column 9: Regenerate button (no separate label)
+  refreshButton.position(startX + columnWidth * 8, regenY);
   
   // Regenerate rectangles for new canvas size
   generateRectangles();
