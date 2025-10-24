@@ -6,6 +6,11 @@ var backRectangles = [];
 var hueOffset = 0; // Random starting point in color wheel
 var vanishingPoint = {x: 0, y: 0}; // Static vanishing point for shadows
 
+// Auto pulse variables
+var autoPulse = true;
+var pulseStartPosition = 0;
+var lastPulseTime = 0;
+
 // Control parameters
 var numBackSlider, numMiddleSlider, numFrontSlider; // Added middle slider
 var backSizeSlider, middleSizeSlider, frontSizeSlider; // Added middle size slider
@@ -265,6 +270,26 @@ function setup() {
 
 function draw() {
   background(255/2);
+  
+  // Auto pulse: 0→360 over 10 sec, then 360→0 over 10 sec (20 sec total cycle)
+  if (autoPulse) {
+    var currentTime = millis();
+    var cycleTime = (currentTime % 20000) / 1000; // 0-20 seconds in cycle
+    
+    if (cycleTime < 10) {
+      // First 10 seconds: 0 → 360
+      var shift = (cycleTime / 10) * 360;
+      colorShiftSlider.value(shift);
+    } else {
+      // Next 10 seconds: 360 → 0
+      var shift = ((20 - cycleTime) / 10) * 360;
+      colorShiftSlider.value(shift);
+    }
+    
+    // Manually trigger color updates
+    updateBackColors();
+    updateFrontColors();
+  }
   
   var cornerRad = cornerRadiusSlider.value();
   
